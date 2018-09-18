@@ -7,4 +7,7 @@
 
 # How To Run
 
-1. node app.js
+1. import schema (postgresql)
+2. package install (npm install)
+3. edit explorer.conf
+4. node app.js
