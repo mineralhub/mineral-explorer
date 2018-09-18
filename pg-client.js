@@ -20,17 +20,21 @@ module.exports.insertBlock = async(block) => {
         await pgcli.query(`BEGIN`);
         await pgcli.query(`INSERT INTO blocks
         (
-            height, 
-            transactions, 
-            hash, 
-            prevhash
+            height,
+            version,
+            transactions,
+            hash,
+            prevhash,
+            created_time
         ) 
         VALUES 
         (
-            ${block.header.height}, 
+            ${block.header.height},
+            ${block.header.version},
             ${block.transactions.length}, 
             '${block.hash}', 
-            '${block.header.prevhash}'
+            '${block.header.prevhash}',
+            to_timestamp(${block.header.timestamp})
         )`);
 
         let values = '';

@@ -13,13 +13,12 @@ async function updateBlock() {
         let rpcHeight = await rpccli.getHeight();
         while (dbHeight < rpcHeight.blockheight) {
             let block = await rpccli.getBlock(dbHeight);
-            // insert block
-            pgcli.insertBlock(block);
-            console.log(block);
+            await pgcli.insertBlock(block);
             ++dbHeight;
         }
         setTimeout(updateBlock, 1000);
     } catch (e) {
+        setTimeout(updateBlock, 1000);
         throw e;
     }
 }
