@@ -22,7 +22,20 @@ module.exports.getBlock = async(height) => {
     try {
         let res = await rp({
             method: 'GET',
-            uri: `http://${node.host}:${node.rpc_port}?id=2&method=getblock&params=[${height + 1}]`,
+            uri: `http://${node.host}:${node.rpc_port}?id=2&method=getblock&params=[${height}]`,
+            json: true
+        });
+        return res.result;
+    } catch (e) {
+        throw e;
+    }
+}
+
+module.exports.getBlocks = async(start, end) => {
+    try {
+        let res = await rp({
+            method: 'GET',
+            uri: `http://${node.host}:${node.rpc_port}?id=2&method=getblocks&params=[${start},${end}]`,
             json: true
         });
         return res.result;
