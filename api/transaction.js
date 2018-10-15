@@ -7,4 +7,9 @@ router.get('/:hash', eah(async (req, res, next) => {
   res.send(tx);
 }));
 
+router.get('/:address/:page', eah(async (req, res, next) => {
+  let txs = await pgcli.getTransactions(req.params.address, (req.params.page - 1) * 20, 20);
+  res.send(txs);
+}));
+
 module.exports = router;

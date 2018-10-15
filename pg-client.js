@@ -135,6 +135,22 @@ module.exports.getTransaction = async (hash) => {
 	return res.rowCount == 0 ? null : res.rows[0];
 };
 
+module.exports.getTransactions = async(address, offset, limit) => {
+	let res = await pgcli.query(`SELECT 
+			version, 
+			type, 
+			extract(epoch from created_time) as created_time, 
+			data, 
+			hash,
+			block_height
+		FROM transactions 
+		WHERE to_address='${address}' OR from_address='${address}' 
+		ORDER BY created_time DESC 
+		LIMIT ${limit} 
+		OFFSET ${offset}`);
+	return res.rows;
+};
+
 module.exports.getAccountBalance = async (address) => {
 	let res = await pgcli.query(`SELECT
 			balance
