@@ -10,7 +10,15 @@ CREATE TABLE IF NOT EXISTS blocks (
 CREATE TABLE IF NOT EXISTS transactions (
     version         SMALLINT,
     type            SMALLINT,
+    from_address    TEXT,
+    to_address      TEXT,
     created_time    TIMESTAMP,
     data            JSON,
-    hash            TEXT
+    hash            TEXT,
+    block_height    INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS accounts (
+    address         TEXT NOT NULL PRIMARY KEY,
+    balance         BIGINT
 );

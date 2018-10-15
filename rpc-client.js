@@ -1,9 +1,5 @@
 const rp = require('request-promise');
-var node = null;
-
-module.exports.init = function(config) {
-    node = config;
-}
+const node = require('./configure').node;
 
 module.exports.getHeight = async () => {
     try {
