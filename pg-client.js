@@ -156,9 +156,11 @@ module.exports.getAccountBalance = async (address) => {
 			balance
 		FROM accounts
 		WHERE address='${address}'`);
-	if (res.rowCount == 0)
-		return null;
-
+	if (res.rowCount == 0) {
+		return {
+			balance : 0
+		}
+	}
 	res.rows[0].balance = Number(res.rows[0].balance);
 	return res.rows[0];
 };

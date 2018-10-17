@@ -38,8 +38,8 @@ async function updateBlock() {
 				await pgcli.insertBlock(blocks[i]);
 				updateBlockQueue(blocks[i]);
 			}
-			io.emit('lastblocks', {block: blockQueue});
-			io.emit('lasttransactions', {transaction: txQueue});
+			io.emit('lastblocks', {block: blockQueue.slice().reverse()});
+			io.emit('lasttransactions', {transaction: txQueue.slice().reverse()});
 			await pgcli.commit();
 			dbHeight += diff;
 		}
@@ -61,8 +61,8 @@ async function mainFunc() {
 
 		io.on('connection', (socket) => {					
 			console.log('connection');
-			socket.emit('lastblocks', {block: blockQueue});
-			socket.emit('lasttransactions', {transaction: txQueue});
+			socket.emit('lastblocks', {block: blockQueue.slice().reverse()});
+			socket.emit('lasttransactions', {transaction: txQueue.slice().reverse()});
 		});
 		io.listen(3001);
 				
