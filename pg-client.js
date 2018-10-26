@@ -109,7 +109,7 @@ module.exports.insertBlock = async (block) => {
 		SET balance = accounts.balance + EXCLUDED.balance`);
 };
 
-module.exports.getBlock = async (hash) => {
+module.exports.getBlock = async (height) => {
 	let res = await pgcli.query(`SELECT 
 			height, 
 			version, 
@@ -118,7 +118,7 @@ module.exports.getBlock = async (hash) => {
 			prevhash, 
 			extract(epoch from created_time) as created_time 
 		FROM blocks 
-		WHERE hash='${hash}'`);
+		WHERE height='${height}'`);
 	return res.rowCount == 0 ? null : res.rows[0];
 }
 
