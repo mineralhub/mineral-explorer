@@ -1,4 +1,5 @@
 const app = require('express')();
+const bodyParser = require('body-parser');
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 const pgcli = require('./pg-client');
@@ -54,6 +55,7 @@ async function updateBlock() {
 async function mainFunc() {
 	try {
 		app.use(require('cors')());
+		app.use(bodyParser.json());
 		app.use('/transaction', require('./api/transaction.js'));
 		app.use('/block', require('./api/block.js'));
 		app.use('/account', require('./api/account.js'));
