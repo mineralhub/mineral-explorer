@@ -40,7 +40,7 @@ module.exports.getBlocks = async (start, end) => {
   }
 }
 
-module.exports.sendTo = async (bytes) => {
+module.exports.addTransaction = async (bytes) => {
   try {
     console.log(bytes);
     let res = await rp({
@@ -48,7 +48,7 @@ module.exports.sendTo = async (bytes) => {
       uri: `http://${node.host}:${node.rpc_port}`,
       body: {
         id: 3,
-        method: 'sendto',
+        method: 'addtransaction',
         params: [bytes]
       },
       json: true

@@ -1,3 +1,9 @@
+DROP TABLE IF EXISTS blocks;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS txindex;
+DROP TABLE IF EXISTS delegates;
+
 CREATE TABLE IF NOT EXISTS blocks (
     height          INTEGER NOT NULL PRIMARY KEY,
     version         SMALLINT,
@@ -19,7 +25,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 CREATE TABLE IF NOT EXISTS accounts (
     address         TEXT NOT NULL PRIMARY KEY,
-    balance         BIGINT
+    balance         BIGINT,
+    lock            BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS txindex (
@@ -28,8 +35,14 @@ CREATE TABLE IF NOT EXISTS txindex (
 );
 CREATE INDEX idx_address ON txindex(address);
 
+CREATE TABLE IF NOT EXISTS delegates (
+    address         TEXT NOT NULL,
+    name            TEXT,
+    total_vote      BIGINT
+);
 
 truncate blocks;
 truncate transactions;
 truncate accounts;
 truncate txindex;
+truncate delegates;

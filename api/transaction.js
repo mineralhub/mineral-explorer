@@ -14,8 +14,8 @@ router.get('/:address/:page', eah(async (req, res, next) => {
   res.send(txs);
 }));
 
-router.post('/sendto', eah(async (req, res, next) => {
-  let rpc = await rpccli.sendTo(req.body.bytes);
+router.post('/add', eah(async (req, res, next) => {
+  let rpc = await rpccli.addTransaction(req.body.bytes);
   res.send(rpc);
 }));
 
