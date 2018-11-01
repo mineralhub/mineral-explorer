@@ -24,7 +24,7 @@ function addAccountBalance(list, addr, txhash, amount) {
 	if (list[addr] === undefined)
 		list[addr] = {amount:0, txs: []};
 	
-	[addr].amount += amount;
+	list[addr].amount += amount;
 	if (txhash)
 		list[addr].txs.push(txhash);
 }
@@ -41,7 +41,10 @@ function lockBalance(list, addr, txhash, amount) {
 		list[addr] = {amount: 0, txs: []};
 
 	list[addr].amount = amount;
-	[addr].txs.push(txhash);
+	list[addr].txs.push(txhash);
+}
+
+function unlockBalance(list, addr, txhash) {
 }
 
 module.exports.insertBlock = async (block) => {
@@ -71,6 +74,7 @@ module.exports.insertBlock = async (block) => {
 
 	let changeBalanceList = {};
 	let lockBalanceList = {};
+	let unlockBalanceList = {};
 	let registerDelegateList = {};
 	let voteDelegateList = {};
 	let values = '';
@@ -98,19 +102,23 @@ module.exports.insertBlock = async (block) => {
 			break;
 			case 3: {
 				for (let addr in tx.data.votes) {
-					addDelegateVote(voteDelegateList, addr, tx.data.votes[addr]);
+					addDelegateVote(voteDelegateList, common.addressHashToAddr(addr), tx.data.votes[addr]);
 				}
 			}
 			case 4: {
 				if (tx.data.fee)
 					addAccountBalance(changeBalanceList, from, tx.hash, -tx.data.fee);
-
-				registerDelegateList[from] = name;
+				registerDelegateList[from] = tx.data.name;
 			}
 			break;
 			case 7: {
 				lockBalance(lockBalanceList, from, tx.hash, tx.data.locks);
 				addAccountBalance(changeBalanceList, from, undefined, -tx.data.locks);
+			}
+			break;
+			case 8: {
+				//lockBalance(lockBalanceList, from, tx.hash, 0);
+				//addAccountBalance(changeBalanceList, from, undefined, -tx.data.locks);
 			}
 			break;
 		}
@@ -173,16 +181,14 @@ module.exports.insertBlock = async (block) => {
 	}
 
 	try {
-		if (0 < lockBalanceList.length) {
-			await pgcli.query(`INSERT INTO accounts
-			(
-				address,
-				lock
-			) 
-			VALUES ` + values + `
-			ON CONFLICT (address) DO UPDATE
-			SET
-			lock = EXCLUDED.lock`);
+		if (0 < values.length) {
+			await pgcli.query(`UPDATE accounts as a
+			SET 
+				lock=v.lock
+			FROM (values
+				${values}
+			) as v(address, lock)
+			WHERE a.address = v.address`);
 		}
 	} catch (e) {
 		console.log('exception. insert accounts (lock)');
@@ -205,11 +211,11 @@ module.exports.insertBlock = async (block) => {
 	for (let addr in registerDelegateList) {
 		if (0 < values.length)
 			values += ',';
-		values += `(${addr}, ${registerDelegateList[addr]})`;
+		values += `('${addr}', '${registerDelegateList[addr]}', 0)`;
 	}
 
 	try {
-		if (0 < registerDelegateList.length) {
+		if (0 < values.length) {
 			await pgcli.query(`INSERT INTO delegates
 			(
 				address,

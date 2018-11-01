@@ -32,7 +32,7 @@ async function updateBlock() {
 		while (dbHeight < rpcHeight.blockheight) {
 			let diff = rpcHeight.blockheight - dbHeight;
 			diff = 100 < diff ? 100 : diff;
-			let res = await rpccli.getBlocks(dbHeight + 1, dbHeight + 1 + diff);
+			let res = await rpccli.getBlocks(0 < dbHeight ? dbHeight + 1 : 0, dbHeight + 1 + diff);
 			let blocks = res.blocks;
 			await pgcli.beginTransaction();
 			for (let i = 0; i < blocks.length; ++i) {
