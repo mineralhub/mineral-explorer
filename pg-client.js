@@ -21,7 +21,8 @@ module.exports.getLastBlockHeight = async () => {
 };
 
 module.exports.insertBlock = async (block) => {
-	await pgcli.query(`INSERT INTO blocks
+	try {
+		await pgcli.query(`INSERT INTO blocks
   	(
       height,
       version,
@@ -39,6 +40,11 @@ module.exports.insertBlock = async (block) => {
       '${block.header.prevhash}',
       to_timestamp(${block.header.timestamp})
     )`);
+	} catch (e) {
+		console.log('exception. insert blocks');
+		throw e;
+	}
+
 
 	let accounts = {};
 	let values = '';
@@ -46,60 +52,81 @@ module.exports.insertBlock = async (block) => {
 		let tx = block.transactions[i];
 		if (0 < values.length)
 			values += ',';
-		let to = '';
-		if (tx.data.to)
-			to = common.addressHashToAddr(tx.data.to);
 		let from = common.addressHashToAddr(tx.data.from);
 
-		values += `(${tx.version}, ${tx.type}, '${from}', '${to}', to_timestamp(${tx.timestamp}), '${JSON.stringify(tx.data)}', '${tx.hash}', ${block.header.height})`;
+		values += `(${tx.version}, ${tx.type}, '${from}', to_timestamp(${tx.timestamp}), '${JSON.stringify(tx.data)}', '${tx.hash}', ${block.header.height})`;
 
 		switch (tx.type) {
 			case 1: {
-				if (accounts[from])
-					accounts[from] += tx.data.reward;
-				else 
-					accounts[from] = tx.data.reward;
+				if (accounts[from]) {
+					accounts[from].amount += tx.data.reward;
+					accounts[from].txs.push(tx.hash);
+				}
+				else {
+					accounts[from] = { amount: tx.data.reward, txs: [tx.hash] };
+				}
 			}
 			break;
 			case 2: {
 				let t = 0;
-				for (let k in tx.data.to) {
-					let addr = common.addressHashToAddr(k);
-					if (accounts[addr])
-						accounts[addr] += tx.data.to[k];
-					else
-						accounts[addr] = tx.data.to[k];
-					t += tx.data.to[k];
+				for (let k = 0; k < tx.data.to.length; ++k) {
+					let to = tx.data.to[k];
+					let addr = common.addressHashToAddr(to.addr);
+					if (accounts[addr]) {
+						accounts[addr].amount += to.amount;
+						accounts[addr].txs.push(tx.hash);
+					}
+					else {
+						accounts[addr] = { amount: to.amount, txs: [tx.hash] };
+					}
+					t += to.amount;
 				}
-				if (accounts[from])
-					accounts[from] -= t;
-				else
-					accounts[from] = -t;
+				if (accounts[from]) {
+					accounts[from].amount -= t;
+					accounts[from].txs.push(tx.hash);
+				}
+				else {
+					accounts[from] = { amount: -t, txs: [tx.hash] };
+				}
 			}
 			break;
 		}
 	}
-	await pgcli.query(`INSERT INTO transactions
+	try {
+		await pgcli.query(`INSERT INTO transactions
     (
 			version,
 			type,
 			from_address,
-			to_address,
       created_time,
       data,
 			hash,
 			block_height
     )
 		VALUES ` + values);
-
-	values = '';
-	for (let k in accounts) {
-		if (0 < values.length)
-			values += ',';
-		values += `('${k}', ${accounts[k]})`
+	} catch (e) {
+		console.log('exception. insert transactions');
+		throw e;
 	}
 
-	await pgcli.query(`INSERT INTO accounts
+
+	values = '';
+	let idxvalues = '';
+	for (let addr in accounts) {
+		if (0 < values.length) {
+			values += ',';
+		}
+		values += `('${addr}', ${accounts[addr].amount})`;
+		for (let i = 0; i < accounts[addr].txs.length; ++i) {
+			if (0 < idxvalues.length) {
+				idxvalues += ',';
+			}
+			idxvalues += `('${addr}', '${accounts[addr].txs[i]}')`;
+		}
+	}
+
+	try {
+		await pgcli.query(`INSERT INTO accounts
 		(
 			address,
 			balance
@@ -107,6 +134,22 @@ module.exports.insertBlock = async (block) => {
 		VALUES ` + values + `
 		ON CONFLICT (address) DO UPDATE
 		SET balance = accounts.balance + EXCLUDED.balance`);
+	} catch (e) {
+		console.log('exception. insert accounts');
+		throw e;
+	}
+
+	try {
+		await pgcli.query(`INSERT INTO txindex
+		(
+			address,
+			hash
+		)
+		VALUES ` + idxvalues);
+	} catch (e) {
+		console.log('exception. insert txindex');
+		throw e;
+	}
 };
 
 module.exports.getBlock = async (height) => {
@@ -144,7 +187,7 @@ module.exports.getTransactions = async(address, offset, limit) => {
 			hash,
 			block_height
 		FROM transactions 
-		WHERE to_address='${address}' OR from_address='${address}' 
+		WHERE from_address='${address}' 
 		ORDER BY created_time DESC 
 		LIMIT ${limit} 
 		OFFSET ${offset}`);

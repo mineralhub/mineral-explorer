@@ -15,9 +15,7 @@ router.get('/:address/:page', eah(async (req, res, next) => {
 }));
 
 router.post('/sendto', eah(async (req, res, next) => {
-  console.log(req.body.bytes);
   let rpc = await rpccli.sendTo(req.body.bytes);
-  console.log(rpc);
   res.send(rpc);
 }));
 
