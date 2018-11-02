@@ -257,6 +257,22 @@ module.exports.getTransaction = async (hash) => {
 };
 
 module.exports.getTransactions = async(address, offset, limit) => {
+	let idx = await pgcli.query(`SELECT 
+			hash
+		FROM 
+		 	txindex
+		WHERE 
+			address='${address}'
+		ORDER BY num DESC
+		LIMIT ${limit} 
+		OFFSET ${offset}`);
+
+	let values = '';
+	for (let i in idx.rows) {
+		if (0 < values.length)
+			values += ',';
+		values += `'${idx.rows[i].hash}'`;
+	}
 	let res = await pgcli.query(`SELECT 
 			version, 
 			type, 
@@ -264,11 +280,13 @@ module.exports.getTransactions = async(address, offset, limit) => {
 			data, 
 			hash,
 			block_height
-		FROM transactions 
-		WHERE from_address='${address}' 
-		ORDER BY created_time DESC 
-		LIMIT ${limit} 
-		OFFSET ${offset}`);
+		FROM 
+			transactions 
+		WHERE 
+			hash 
+		IN 
+			(${values})
+		ORDER BY created_time DESC`);
 	return res.rows;
 };
 
@@ -292,8 +310,13 @@ module.exports.getAccount = async(address) => {
 		*
 	FROM accounts
 	WHERE address='${address}'`);
-	if (res.rowCount == 0)
-		return null;
+	if (res.rowCount == 0) {
+		return {
+			address: address,
+			balance: 0,
+			lock: 0
+		}
+	}
 
 	return res.rows[0];
 };

@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 CREATE TABLE IF NOT EXISTS txindex (
     address         TEXT NOT NULL,
-    hash            TEXT
+    hash            TEXT,
+    num           BIGSERIAL
 );
 CREATE INDEX idx_address ON txindex(address);
 
