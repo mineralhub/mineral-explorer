@@ -17,7 +17,7 @@ module.exports.rollback = async () => {
 
 module.exports.getLastBlockHeight = async () => {
 	let res = await pgcli.query(`SELECT height FROM blocks ORDER BY height DESC LIMIT 1`);
-	return res.rowCount == 0 ? 0 : res.rows[0].height;
+	return res.rowCount === 0 ? 0 : res.rows[0].height;
 };
 
 function addAccountBalance(list, addr, txhash, amount) {
@@ -240,7 +240,7 @@ module.exports.getBlock = async (height) => {
 			extract(epoch from created_time) as created_time 
 		FROM blocks 
 		WHERE height='${height}'`);
-	return res.rowCount == 0 ? null : res.rows[0];
+	return res.rowCount === 0 ? null : res.rows[0];
 }
 
 module.exports.getTransaction = async (hash) => {
@@ -253,7 +253,7 @@ module.exports.getTransaction = async (hash) => {
 			block_height
 		FROM transactions 
 		WHERE hash='${hash}'`);
-	return res.rowCount == 0 ? null : res.rows[0];
+	return res.rowCount === 0 ? null : res.rows[0];
 };
 
 module.exports.getTransactions = async(address, offset, limit) => {
@@ -266,6 +266,10 @@ module.exports.getTransactions = async(address, offset, limit) => {
 		ORDER BY num DESC
 		LIMIT ${limit} 
 		OFFSET ${offset}`);
+
+	if (idx.rowCount === 0) {
+		return null;
+	}
 
 	let values = '';
 	for (let i in idx.rows) {
@@ -296,7 +300,7 @@ module.exports.getAccountBalance = async (address) => {
 			lock
 		FROM accounts
 		WHERE address='${address}'`);
-	if (res.rowCount == 0) {
+	if (res.rowCount === 0) {
 		return {
 			balance : 0,
 			lock: 0
@@ -310,7 +314,7 @@ module.exports.getAccount = async(address) => {
 		*
 	FROM accounts
 	WHERE address='${address}'`);
-	if (res.rowCount == 0) {
+	if (res.rowCount === 0) {
 		return {
 			address: address,
 			balance: 0,

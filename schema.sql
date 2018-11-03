@@ -25,14 +25,14 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 CREATE TABLE IF NOT EXISTS accounts (
     address         TEXT NOT NULL PRIMARY KEY,
-    balance         BIGINT,
-    lock            BIGINT
+    balance         BIGINT DEFAULT 0,
+    lock            BIGINT DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS txindex (
     address         TEXT NOT NULL,
     hash            TEXT,
-    num           BIGSERIAL
+    num             BIGSERIAL
 );
 CREATE INDEX idx_address ON txindex(address);
 
@@ -41,9 +41,3 @@ CREATE TABLE IF NOT EXISTS delegates (
     name            TEXT,
     total_vote      BIGINT
 );
-
-truncate blocks;
-truncate transactions;
-truncate accounts;
-truncate txindex;
-truncate delegates;

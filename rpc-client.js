@@ -42,7 +42,6 @@ module.exports.getBlocks = async (start, end) => {
 
 module.exports.addTransaction = async (bytes) => {
   try {
-    console.log(bytes);
     let res = await rp({
       method: 'POST',
       uri: `http://${node.host}:${node.rpc_port}`,
@@ -53,11 +52,7 @@ module.exports.addTransaction = async (bytes) => {
       },
       json: true
     });
-    if (res.error) {
-      console.log(res.error);
-      throw res.error;
-    }
-    return res.result;
+    return res;
   } catch (e) {
     throw e;
   }
