@@ -1,6 +1,8 @@
 const { Client } = require('pg');
 const pgcli = new Client(require('./configure').postgresql);
 const common = require('./common');
+const bigInt = require("big-integer");
+
 pgcli.connect();
 
 module.exports.beginTransaction = async () => {
@@ -20,22 +22,6 @@ module.exports.getLastBlockHeight = async () => {
 	return res.rowCount === 0 ? 0 : res.rows[0].height;
 };
 
-function addAccountBalance(list, addr, txhash, amount) {
-	if (list[addr] === undefined)
-		list[addr] = {amount:0, txs: []};
-	
-	list[addr].amount += amount;
-	if (txhash)
-		list[addr].txs.push(txhash);
-}
-
-function addDelegateVote(list, addr, amount) {
-	if (list[addr])
-		list[addr].amount += amount;
-	else
-		list[addr] = {amount: amount};
-}
-
 function lockBalance(list, addr, txhash, amount) {
 	if (list[addr] === undefined)
 		list[addr] = {amount: 0, txs: []};
@@ -45,6 +31,83 @@ function lockBalance(list, addr, txhash, amount) {
 }
 
 function unlockBalance(list, addr, txhash) {
+	if (list[addr] === undefined)
+		list[addr] = {txs: []};
+	list[addr].txs.push(txhash);
+}
+
+async function loadAccount(list, address) {
+	if (list[address])
+		return list[address];
+	let res = await pgcli.query(`SELECT
+	address, balance, lock, vote
+	FROM accounts
+	WHERE address='${address}'`);
+	if (res.rowCount === 0) {
+		list[address] = {
+			address: address,
+			balance: bigInt(0),
+			lock: bigInt(0),
+			vote: {},
+			txs: []
+		}
+	} else {
+		res.rows[0].balance = bigInt(res.rows[0].balance);
+		res.rows[0].lock = bigInt(res.rows[0].lock);
+		res.rows[0].txs = [];
+		list[address] = res.rows[0];
+	}
+	return list[address];
+}
+
+async function loadDelegate(list, address) {
+	if (list[address])
+		return list[address];
+	let res = await pgcli.query(`SELECT
+	address, name, total_vote
+	FROM delegates
+	WHERE address='${address}'`);
+	if (res.rowCount === 0) {
+		list[address] = {
+			address: address,
+			name: undefined,
+			total_vote: bigInt(0)
+		}
+	} else {
+		res.rows[0].total_vote = bigInt(res.rows[0].total_vote);
+		list[address] = res.rows[0];
+	}
+	return list[address];
+}
+
+function addBalance(account, add, txhash) {
+	account.balance = account.balance.add(add);
+	account.txs.push(txhash);
+}
+
+function lockBalance(account, lock, txhash) {
+	account.balance = account.balance.add(-lock);
+	account.lock = lock;
+	account.txs.push(txhash);
+}
+
+function unlockBalance(account, txhash) {
+	account.balance = account.balance.add(account.lock);
+	account.lock = bigInt(0);
+	account.txs.push(txhash);
+}
+
+function addVote(account, delegate, add) {
+	delegate.total_vote = delegate.total_vote.add(add);
+	if (0 < add) {
+		account.vote[delegate.address] = add;
+		account.txs.push(txhash);
+	}
+}
+
+function registerDelegate(account, delegate, name, txhash) {
+	delegate.name = name;
+	account.txs.push(txhash);
 }
 
 module.exports.insertBlock = async (block) => {
@@ -72,12 +135,9 @@ module.exports.insertBlock = async (block) => {
 		throw e;
 	}
 
-	let changeBalanceList = {};
-	let lockBalanceList = {};
-	let unlockBalanceList = {};
-	let registerDelegateList = {};
-	let voteDelegateList = {};
 	let values = '';
+	let accounts = {};
+	let delegates = {};
 	for (let i in block.transactions) {
 		let tx = block.transactions[i];
 		if (0 < values.length)
@@ -87,38 +147,49 @@ module.exports.insertBlock = async (block) => {
 
 		switch (tx.type) {
 			case 1: {
-				addAccountBalance(changeBalanceList, from, tx.hash, tx.data.reward);
+				addBalance(await loadAccount(accounts, from), tx.data.reward, tx.hash);
 			}
 			break;
 			case 2: {
 				let t = 0;
 				for (let j in tx.data.to) {
 					let to = tx.data.to[j];
-					addAccountBalance(changeBalanceList, common.addressHashToAddr(to.addr), tx.hash, to.amount);
+					addBalance(await loadAccount(accounts, common.addressHashToAddr(to.addr)), to.amount, tx.hash);
 					t -= to.amount;
 				}
-				addAccountBalance(changeBalanceList, from, tx.hash, t);
+				addBalance(await loadAccount(accounts, from), t, tx.hash);
 			}
 			break;
 			case 3: {
-				for (let addr in tx.data.votes) {
-					addDelegateVote(voteDelegateList, common.addressHashToAddr(addr), tx.data.votes[addr]);
-				}
+				let old = await loadAccount(accounts, from).vote;
+				for (let addr in old)
+					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), -old[addr]);
+
+				for (let addr in tx.data.votes)
+					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), tx.data.votes[addr]);
 			}
 			case 4: {
-				if (tx.data.fee)
-					addAccountBalance(changeBalanceList, from, tx.hash, -tx.data.fee);
-				registerDelegateList[from] = tx.data.name;
+				registerDelegate(
+					await loadAccount(accounts, from),
+					await loadDelegate(delegates, from),
+					tx.data.name,
+					tx.hash
+				);
 			}
 			break;
 			case 7: {
-				lockBalance(lockBalanceList, from, tx.hash, tx.data.locks);
-				addAccountBalance(changeBalanceList, from, undefined, -tx.data.locks);
+				lockBalance(
+					await loadAccount(accounts, from),
+					tx.data.locks,
+					tx.hash
+				);
 			}
 			break;
 			case 8: {
-				//lockBalance(lockBalanceList, from, tx.hash, 0);
-				//addAccountBalance(changeBalanceList, from, undefined, -tx.data.locks);
+				unlockBalance(
+					await loadAccount(accounts, from),
+					tx.hash
+				);
 			}
 			break;
 		}
@@ -141,15 +212,21 @@ module.exports.insertBlock = async (block) => {
 	}
 
 	values = '';
-	let idxvalues = '';
-	for (let addr in changeBalanceList) {
+	idxvalues = '';
+	for (let addr in accounts) {
+		let account = accounts[addr];
 		if (0 < values.length)
 			values += ',';
-		values += `('${addr}', ${changeBalanceList[addr].amount})`;
-		for (let i in changeBalanceList[addr].txs) {
+		values += `(
+			'${addr}', 
+			${account.balance}, 
+			${account.lock}, 
+			'${JSON.stringify(account.vote)}'
+			)`;
+		for (let i in account.txs) {
 			if (0 < idxvalues.length)
 				idxvalues += ',';
-			idxvalues += `('${addr}', '${changeBalanceList[addr].txs[i]}')`;
+			idxvalues += `('${addr}', '${account.txs[i]}')`;
 		}
 	}
 
@@ -157,41 +234,18 @@ module.exports.insertBlock = async (block) => {
 		await pgcli.query(`INSERT INTO accounts
 		(
 			address,
-			balance
+			balance,
+			lock,
+			vote
 		) 
 		VALUES ` + values + `
 		ON CONFLICT (address) DO UPDATE
 		SET 
-		balance = accounts.balance + EXCLUDED.balance`);
+		balance = EXCLUDED.balance,
+		lock = EXCLUDED.lock,
+		vote = EXCLUDED.vote`);
 	} catch (e) {
 		console.log('exception. insert accounts');
-		throw e;
-	}
-
-	values = '';
-	for (let addr in lockBalanceList) {
-		if (0 < values.length)
-			values += ',';
-		values += `('${addr}', ${lockBalanceList[addr].amount})`;
-		for (let i in lockBalanceList[addr].txs) {
-			if (0 < idxvalues.length)
-				idxvalues += ',';
-			idxvalues += `('${addr}', '${lockBalanceList[addr].txs[i]}')`;
-		}
-	}
-
-	try {
-		if (0 < values.length) {
-			await pgcli.query(`UPDATE accounts as a
-			SET 
-				lock=v.lock
-			FROM (values
-				${values}
-			) as v(address, lock)
-			WHERE a.address = v.address`);
-		}
-	} catch (e) {
-		console.log('exception. insert accounts (lock)');
 		throw e;
 	}
 
@@ -208,10 +262,11 @@ module.exports.insertBlock = async (block) => {
 	}
 
 	values = '';
-	for (let addr in registerDelegateList) {
+	for (let addr in delegates) {
+		let delegate = delegates[addr];
 		if (0 < values.length)
 			values += ',';
-		values += `('${addr}', '${registerDelegateList[addr]}', 0)`;
+		values += `('${addr}', '${delegate.name}', ${delegate.total_vote})`;
 	}
 
 	try {
@@ -222,7 +277,10 @@ module.exports.insertBlock = async (block) => {
 				name,
 				total_vote
 			)
-			VALUES ` + values);
+			VALUES ` + values + `
+			ON CONFLICT (address) DO UPDATE
+			SET
+			total_vote = EXCLUDED.total_vote`);
 		}
 	} catch (e) {
 		console.log('exception. insert delegates');

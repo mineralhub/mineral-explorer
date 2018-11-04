@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS accounts (
     address         TEXT NOT NULL PRIMARY KEY,
     balance         BIGINT DEFAULT 0,
-    lock            BIGINT DEFAULT 0
+    lock            BIGINT DEFAULT 0,
+    vote            JSON
 );
 
 CREATE TABLE IF NOT EXISTS txindex (
@@ -37,7 +38,7 @@ CREATE TABLE IF NOT EXISTS txindex (
 CREATE INDEX idx_address ON txindex(address);
 
 CREATE TABLE IF NOT EXISTS delegates (
-    address         TEXT NOT NULL,
+    address         TEXT NOT NULL PRIMARY KEY,
     name            TEXT,
     total_vote      BIGINT
 );
