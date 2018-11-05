@@ -22,20 +22,6 @@ module.exports.getLastBlockHeight = async () => {
 	return res.rowCount === 0 ? 0 : res.rows[0].height;
 };
 
-function lockBalance(list, addr, txhash, amount) {
-	if (list[addr] === undefined)
-		list[addr] = {amount: 0, txs: []};
-
-	list[addr].amount = amount;
-	list[addr].txs.push(txhash);
-}
-
-function unlockBalance(list, addr, txhash) {
-	if (list[addr] === undefined)
-		list[addr] = {txs: []};
-	list[addr].txs.push(txhash);
-}
-
 async function loadAccount(list, address) {
 	if (list[address])
 		return list[address];
@@ -139,12 +125,11 @@ module.exports.insertBlock = async (block) => {
 	let accounts = {};
 	let delegates = {};
 	for (let i in block.transactions) {
+		let subdata = undefined;
 		let tx = block.transactions[i];
 		if (0 < values.length)
 			values += ',';
 		let from = common.addressHashToAddr(tx.data.from);
-		values += `(${tx.version}, ${tx.type}, '${from}', to_timestamp(${tx.timestamp}), '${JSON.stringify(tx.data)}', '${tx.hash}', ${block.header.height})`;
-
 		switch (tx.type) {
 			case 1: {
 				addBalance(await loadAccount(accounts, from), tx.data.reward, tx.hash);
@@ -186,13 +171,27 @@ module.exports.insertBlock = async (block) => {
 			}
 			break;
 			case 8: {
+				let account = await loadAccount(accounts, from);
+				subdata = { lock : account.lock};
 				unlockBalance(
-					await loadAccount(accounts, from),
+					account,
 					tx.hash
 				);
 			}
 			break;
 		}
+
+		values += `(
+			${tx.version}, 
+			${tx.type}, 
+			'${from}', 
+			to_timestamp(${tx.timestamp}), 
+			'${JSON.stringify(tx.data)}', 
+			'${tx.hash}', 
+			${block.header.height}, 
+			${subdata === undefined ? 'null' : `'${JSON.stringify(subdata)}'`}
+		)`;
+
 	}
 	try {
 		await pgcli.query(`INSERT INTO transactions
@@ -203,7 +202,8 @@ module.exports.insertBlock = async (block) => {
       created_time,
       data,
 			hash,
-			block_height
+			block_height,
+			sub_data
     )
 		VALUES ` + values);
 	} catch (e) {
@@ -308,7 +308,8 @@ module.exports.getTransaction = async (hash) => {
 			extract(epoch from created_time) as created_time, 
 			data, 
 			hash,
-			block_height
+			block_height,
+			sub_data
 		FROM transactions 
 		WHERE hash='${hash}'`);
 	return res.rowCount === 0 ? null : res.rows[0];
@@ -341,7 +342,8 @@ module.exports.getTransactions = async(address, offset, limit) => {
 			extract(epoch from created_time) as created_time, 
 			data, 
 			hash,
-			block_height
+			block_height,
+			sub_data
 		FROM 
 			transactions 
 		WHERE 

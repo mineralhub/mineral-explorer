@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_time    TIMESTAMP,
     data            JSON,
     hash            TEXT,
-    block_height    INTEGER NOT NULL
+    block_height    INTEGER NOT NULL,
+    sub_data        JSON
 );
 
 CREATE TABLE IF NOT EXISTS accounts (
