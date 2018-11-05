@@ -44,10 +44,10 @@ async function updateBlock() {
 			await pgcli.commit();
 			dbHeight += diff;
 		}
-		setTimeout(updateBlock, 1000);
+		setTimeout(await updateBlock, 1000);
 	} catch (e) {
 		pgcli.rollback();
-		setTimeout(updateBlock, 1000);
+		setTimeout(await updateBlock, 1000);
 		throw e;
 	}
 }
@@ -59,7 +59,7 @@ async function mainFunc() {
 		app.use('/transaction', require('./api/transaction.js'));
 		app.use('/block', require('./api/block.js'));
 		app.use('/account', require('./api/account.js'));
-		server.listen(80);
+		server.listen(8080);
 
 		io.on('connection', (socket) => {					
 			console.log('connection');
