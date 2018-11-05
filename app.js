@@ -67,7 +67,6 @@ async function mainFunc() {
 			socket.emit('lasttransactions', {transaction: txQueue.slice().reverse()});
 		});
 		io.listen(3001);
-				
 		updateBlock();
 	} catch(e) {
 		console.log(e);
