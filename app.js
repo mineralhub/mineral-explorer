@@ -59,6 +59,7 @@ async function mainFunc() {
 		app.use('/transaction', require('./api/transaction.js'));
 		app.use('/block', require('./api/block.js'));
 		app.use('/account', require('./api/account.js'));
+		app.use('/delegate', require('./api/delegate.js'));
 		server.listen(8080);
 
 		io.on('connection', (socket) => {					

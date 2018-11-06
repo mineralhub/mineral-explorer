@@ -41,5 +41,6 @@ CREATE INDEX idx_address ON txindex(address);
 CREATE TABLE IF NOT EXISTS delegates (
     address         TEXT NOT NULL PRIMARY KEY,
     name            TEXT,
-    total_vote      BIGINT
+    total_vote      BIGINT DEFAULT 0,
+    round_vote      BIGINT DEFAULT 0
 );

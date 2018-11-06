@@ -3,6 +3,8 @@ const pgcli = new Client(require('./configure').postgresql);
 const common = require('./common');
 const bigInt = require("big-integer");
 
+const RoundBlock = 100;
+
 pgcli.connect();
 
 module.exports.beginTransaction = async () => {
@@ -57,7 +59,7 @@ async function loadDelegate(list, address) {
 		list[address] = {
 			address: address,
 			name: undefined,
-			total_vote: bigInt(0)
+			total_vote: bigInt(0),
 		}
 	} else {
 		res.rows[0].total_vote = bigInt(res.rows[0].total_vote);
@@ -286,6 +288,15 @@ module.exports.insertBlock = async (block) => {
 		console.log('exception. insert delegates');
 		throw e;
 	}
+
+	try {
+		if (block.height % RoundBlock === 0) {
+			await pgcli.query(`UPDATE delegates SET round_vote=total_vote`);
+		}
+	} catch (e) {
+		console.log('exception. update delegates');
+		throw e;
+	}
 };
 
 module.exports.getBlock = async (height) => {
@@ -384,3 +395,10 @@ module.exports.getAccount = async(address) => {
 
 	return res.rows[0];
 };
+
+module.exports.getDelegates = async() => {
+	let res = await pgcli.query(`SELECT
+		*
+	FROM delegates`);
+	return res.rowCount === 0 ? [] : res.rows;
+}
