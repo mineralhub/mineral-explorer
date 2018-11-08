@@ -70,7 +70,9 @@ async function loadDelegate(list, address) {
 
 function addBalance(account, add, txhash) {
 	account.balance = account.balance.add(add);
-	account.txs.push(txhash);
+	if (txhash) {
+		account.txs.push(txhash);
+	}
 }
 
 function lockBalance(account, lock, txhash) {
@@ -132,6 +134,10 @@ module.exports.insertBlock = async (block) => {
 		if (0 < values.length)
 			values += ',';
 		let from = await loadAccount(accounts, common.addressHashToAddr(tx.data.from));
+		let fee = bigInt(tx.data.fee);
+		if (0 < fee)
+			addBalance(from, -fee);
+
 		switch (tx.type) {
 			case 1: {
 				addBalance(from, tx.data.reward, tx.hash);
@@ -150,11 +156,12 @@ module.exports.insertBlock = async (block) => {
 			case 3: {
 				let old = from.vote;
 				for (let addr in old)
-					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), -old[addr], tx.hash);
+					addVote(from, await loadDelegate(delegates, addr), -old[addr], tx.hash);
 
 				for (let addr in tx.data.votes)
 					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), tx.data.votes[addr], tx.hash);
 			}
+			break;
 			case 4: {
 				registerDelegate(
 					from,
@@ -289,7 +296,7 @@ module.exports.insertBlock = async (block) => {
 	}
 
 	try {
-		if (block.height % RoundBlock === 0) {
+		if (block.header.height % RoundBlock === 0) {
 			await pgcli.query(`UPDATE delegates SET round_vote=total_vote`);
 		}
 	} catch (e) {
