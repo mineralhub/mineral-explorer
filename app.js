@@ -54,6 +54,8 @@ async function updateBlock() {
 
 async function mainFunc() {
 	try {
+		require('./configure').blockchain = await rpccli.getConfig();
+		
 		app.use(require('cors')());
 		app.use(bodyParser.json());
 		app.use('/transaction', require('./api/transaction.js'));

@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-const pgcli = new Client(require('./configure').postgresql);
+const pgcli = new Client(require('./configure').explorer.postgresql);
 const common = require('./common');
 const bigInt = require("big-integer");
 
@@ -77,7 +77,7 @@ function addBalance(account, add, txhash) {
 
 function lockBalance(account, lock, txhash) {
 	account.balance = account.balance.add(-lock);
-	account.lock = lock;
+	account.lock += lock;
 	account.txs.push(txhash);
 }
 

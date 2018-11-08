@@ -1,5 +1,18 @@
 const rp = require('request-promise');
-const node = require('./configure').node;
+const node = require('./configure').explorer.node;
+
+module.exports.getConfig = async () => {
+  try {
+    let res = await rp({
+      method: 'GET',
+      uri: `http://${node.host}:${node.rpc_port}?id=1&method=getconfig&params=[]`,
+      json: true
+    });
+    return res.result;
+  } catch (e) {
+    throw e;
+  }
+}
 
 module.exports.getHeight = async () => {
   try {

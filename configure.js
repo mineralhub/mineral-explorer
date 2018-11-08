@@ -1,4 +1,6 @@
 const fs = require('fs');
-const config = JSON.parse(fs.readFileSync('./explorer.conf'));
+const explorer = JSON.parse(fs.readFileSync('./explorer.conf'));
+var blockchain = undefined;
 
-module.exports = config;
+module.exports.explorer = explorer;
+module.exports.blockchain = blockchain;
