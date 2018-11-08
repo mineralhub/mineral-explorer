@@ -85,7 +85,7 @@ function unlockBalance(account, txhash) {
 	account.txs.push(txhash);
 }
 
-function addVote(account, delegate, add) {
+function addVote(account, delegate, add, txhash) {
 	delegate.total_vote = delegate.total_vote.add(add);
 	if (0 < add) {
 		account.vote[delegate.address] = add;
@@ -131,10 +131,10 @@ module.exports.insertBlock = async (block) => {
 		let tx = block.transactions[i];
 		if (0 < values.length)
 			values += ',';
-		let from = common.addressHashToAddr(tx.data.from);
+		let from = await loadAccount(accounts, common.addressHashToAddr(tx.data.from));
 		switch (tx.type) {
 			case 1: {
-				addBalance(await loadAccount(accounts, from), tx.data.reward, tx.hash);
+				addBalance(from, tx.data.reward, tx.hash);
 			}
 			break;
 			case 2: {
@@ -144,21 +144,21 @@ module.exports.insertBlock = async (block) => {
 					addBalance(await loadAccount(accounts, common.addressHashToAddr(to.addr)), to.amount, tx.hash);
 					t -= to.amount;
 				}
-				addBalance(await loadAccount(accounts, from), t, tx.hash);
+				addBalance(from, t, tx.hash);
 			}
 			break;
 			case 3: {
-				let old = await loadAccount(accounts, from).vote;
+				let old = from.vote;
 				for (let addr in old)
-					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), -old[addr]);
+					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), -old[addr], tx.hash);
 
 				for (let addr in tx.data.votes)
-					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), tx.data.votes[addr]);
+					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), tx.data.votes[addr], tx.hash);
 			}
 			case 4: {
 				registerDelegate(
-					await loadAccount(accounts, from),
-					await loadDelegate(delegates, from),
+					from,
+					await loadDelegate(delegates, from.address),
 					tx.data.name,
 					tx.hash
 				);
@@ -166,17 +166,16 @@ module.exports.insertBlock = async (block) => {
 			break;
 			case 7: {
 				lockBalance(
-					await loadAccount(accounts, from),
+					from,
 					tx.data.locks,
 					tx.hash
 				);
 			}
 			break;
 			case 8: {
-				let account = await loadAccount(accounts, from);
-				subdata = { lock : account.lock};
+				subdata = { lock : from.lock};
 				unlockBalance(
-					account,
+					from,
 					tx.hash
 				);
 			}
