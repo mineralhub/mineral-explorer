@@ -1,6 +1,6 @@
 const { Client } = require('pg');
 const pgcli = new Client(require('./configure').explorer.postgresql);
-const common = require('./common');
+const blockchain = require('./common/blockchain');
 const bigInt = require("big-integer");
 
 const RoundBlock = 100;
@@ -133,7 +133,7 @@ module.exports.insertBlock = async (block) => {
 		let tx = block.transactions[i];
 		if (0 < values.length)
 			values += ',';
-		let from = await loadAccount(accounts, common.addressHashToAddr(tx.data.from));
+		let from = await loadAccount(accounts, blockchain.toAddressFromHash(tx.data.from));
 		let fee = bigInt(tx.data.fee);
 		if (0 < fee)
 			addBalance(from, -fee);
@@ -147,7 +147,7 @@ module.exports.insertBlock = async (block) => {
 				let t = 0;
 				for (let j in tx.data.to) {
 					let to = tx.data.to[j];
-					addBalance(await loadAccount(accounts, common.addressHashToAddr(to.addr)), to.amount, tx.hash);
+					addBalance(await loadAccount(accounts, blockchain.toAddressFromHash(to.addr)), to.amount, tx.hash);
 					t -= to.amount;
 				}
 				addBalance(from, t, tx.hash);
@@ -159,7 +159,7 @@ module.exports.insertBlock = async (block) => {
 					addVote(from, await loadDelegate(delegates, addr), -old[addr], tx.hash);
 
 				for (let addr in tx.data.votes)
-					addVote(from, await loadDelegate(delegates, common.addressHashToAddr(addr)), tx.data.votes[addr], tx.hash);
+					addVote(from, await loadDelegate(delegates, blockchain.toAddressFromHash(addr)), tx.data.votes[addr], tx.hash);
 			}
 			break;
 			case 4: {

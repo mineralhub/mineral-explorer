@@ -13,14 +13,18 @@
     "body-parser": "^1.18.3",
     "bs58check": "^2.1.2",
     "cors": "^2.8.4",
+    "elliptic": "^6.4.1",
     "express": "^4.16.3",
     "express-async-handler": "^1.1.4",
     "fs": "0.0.1-security",
+    "int64-buffer": "^0.99.1007",
+    "keccak": "^1.4.0",
     "pg": "^7.4.3",
     "process": "^0.11.10",
     "promise": "^8.0.1",
     "request": "^2.88.0",
     "request-promise": "^4.2.2",
+    "scryptsy": "^2.0.0",
     "socket.io": "^2.1.1",
     "ws": "^6.0.0"
   }
