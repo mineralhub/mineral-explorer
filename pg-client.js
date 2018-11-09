@@ -87,11 +87,10 @@ function unlockBalance(account, txhash) {
 	account.txs.push(txhash);
 }
 
-function addVote(account, delegate, add, txhash) {
+function addVote(account, delegate, add) {
 	delegate.total_vote = delegate.total_vote.add(add);
 	if (0 < add) {
 		account.vote[delegate.address] = add;
-		account.txs.push(txhash);
 	}
 }
 
@@ -156,10 +155,11 @@ module.exports.insertBlock = async (block) => {
 			case 3: {
 				let old = from.vote;
 				for (let addr in old)
-					addVote(from, await loadDelegate(delegates, addr), -old[addr], tx.hash);
-
+					addVote(from, await loadDelegate(delegates, addr), -old[addr]);
+				from.vote = {};
 				for (let addr in tx.data.votes)
-					addVote(from, await loadDelegate(delegates, blockchain.toAddressFromHash(addr)), tx.data.votes[addr], tx.hash);
+					addVote(from, await loadDelegate(delegates, blockchain.toAddressFromHash(addr)), tx.data.votes[addr]);
+				from.txs.push(tx.hash);
 			}
 			break;
 			case 4: {
@@ -405,6 +405,7 @@ module.exports.getAccount = async(address) => {
 module.exports.getDelegates = async() => {
 	let res = await pgcli.query(`SELECT
 		*
-	FROM delegates`);
+	FROM delegates
+	ORDER BY round_vote DESC`);
 	return res.rowCount === 0 ? [] : res.rows;
 }
