@@ -1,10 +1,10 @@
 const crypto = require('crypto');
 const RIPEMD160 = require('ripemd160');
 const bs58Encode = require('bs58check').encode;
-const EC = require('elliptic');
+const EC = require('elliptic').ec;
 const scrypt = require('scryptsy');
 const keccak = require('keccak');
-const bigInt = require('big-integer');
+const int64 = require('int64-buffer').Int64LE;
 const txTypeStr = [
   "None", 
   "RewardTransaction", 
@@ -44,7 +44,7 @@ module.exports.toFixed8Long = (str) => {
     str += '0'
     ++fixedLen;
   }
-  return new bigInt(str);
+  return new int64(str);
 }
 
 module.exports.toPubkey = (prikey) => {
