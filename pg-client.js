@@ -1,5 +1,6 @@
 const { Client } = require('pg');
-const pgcli = new Client(require('./configure').explorer.postgresql);
+const config = require('./configure');
+const pgcli = new Client(config.explorer.postgresql);
 const blockchain = require('./common/blockchain');
 const bigInt = require("big-integer");
 
@@ -21,7 +22,7 @@ module.exports.rollback = async () => {
 
 module.exports.getLastBlockHeight = async () => {
 	let res = await pgcli.query(`SELECT height FROM blocks ORDER BY height DESC LIMIT 1`);
-	return res.rowCount === 0 ? 0 : res.rows[0].height;
+	return res.rowCount === 0 ? -1 : res.rows[0].height;
 };
 
 async function loadAccount(list, address) {
@@ -99,6 +100,84 @@ function registerDelegate(account, delegate, name, txhash) {
 	account.txs.push(txhash);
 }
 
+async function insertAndUpdateAccounts(accounts) {
+	try {
+		let values = '';
+		let idxvalues = '';
+		for (let addr in accounts) {
+			let account = accounts[addr];
+			if (0 < values.length)
+				values += ',';
+			values += `(
+			'${addr}', 
+			${account.balance}, 
+			${account.lock}, 
+			'${JSON.stringify(account.vote)}'
+			)`;
+			for (let i in account.txs) {
+				if (0 < idxvalues.length)
+					idxvalues += ',';
+				idxvalues += `('${addr}', '${account.txs[i]}')`;
+			}
+		}
+		if (0 < values.length) {
+			await pgcli.query(`INSERT INTO accounts
+			(
+				address,
+				balance,
+				lock,
+				vote
+			) 
+			VALUES ` + values + `
+			ON CONFLICT (address) DO UPDATE
+			SET 
+			balance = EXCLUDED.balance,
+			lock = EXCLUDED.lock,
+			vote = EXCLUDED.vote`);
+		}
+
+		if (0 < idxvalues.length) {
+			await pgcli.query(`INSERT INTO txindex
+			(
+				address,
+				hash
+			)
+			VALUES ` + idxvalues);
+		}
+	} catch (e) {
+		console.log('exception. insert accounts');
+		throw e;
+	}
+}
+
+async function insertAndUpdateDelegates(delegates) {
+	try {
+		let values = '';
+		for (let addr in delegates) {
+			let delegate = delegates[addr];
+			if (0 < values.length)
+				values += ',';
+			values += `('${addr}', '${delegate.name}', ${delegate.total_vote})`;
+		}
+
+		if (0 < values.length) {
+			await pgcli.query(`INSERT INTO delegates
+			(
+				address,
+				name,
+				total_vote
+			)
+			VALUES ` + values + `
+			ON CONFLICT (address) DO UPDATE
+			SET
+			total_vote = EXCLUDED.total_vote`);
+		}
+	} catch (e) {
+		console.log('exception. insert delegates');
+		throw e;
+	}
+}
+
 module.exports.insertBlock = async (block) => {
 	try {
 		await pgcli.query(`INSERT INTO blocks
@@ -139,7 +218,7 @@ module.exports.insertBlock = async (block) => {
 
 		switch (tx.type) {
 			case 1: {
-				addBalance(from, tx.data.reward, tx.hash);
+				addBalance(from, tx.data.supply, tx.hash);
 			}
 			break;
 			case 2: {
@@ -192,108 +271,40 @@ module.exports.insertBlock = async (block) => {
 		values += `(
 			${tx.version}, 
 			${tx.type}, 
-			'${from}', 
+			'${from.address}', 
 			to_timestamp(${tx.timestamp}), 
 			'${JSON.stringify(tx.data)}', 
 			'${tx.hash}', 
 			${block.header.height}, 
 			${subdata === undefined ? 'null' : `'${JSON.stringify(subdata)}'`}
 		)`;
-
-	}
-	try {
-		await pgcli.query(`INSERT INTO transactions
-    (
-			version,
-			type,
-			from_address,
-      created_time,
-      data,
-			hash,
-			block_height,
-			sub_data
-    )
-		VALUES ` + values);
-	} catch (e) {
-		console.log('exception. insert transactions');
-		throw e;
 	}
 
-	values = '';
-	idxvalues = '';
-	for (let addr in accounts) {
-		let account = accounts[addr];
-		if (0 < values.length)
-			values += ',';
-		values += `(
-			'${addr}', 
-			${account.balance}, 
-			${account.lock}, 
-			'${JSON.stringify(account.vote)}'
-			)`;
-		for (let i in account.txs) {
-			if (0 < idxvalues.length)
-				idxvalues += ',';
-			idxvalues += `('${addr}', '${account.txs[i]}')`;
-		}
-	}
-
-	try {
-		await pgcli.query(`INSERT INTO accounts
-		(
-			address,
-			balance,
-			lock,
-			vote
-		) 
-		VALUES ` + values + `
-		ON CONFLICT (address) DO UPDATE
-		SET 
-		balance = EXCLUDED.balance,
-		lock = EXCLUDED.lock,
-		vote = EXCLUDED.vote`);
-	} catch (e) {
-		console.log('exception. insert accounts');
-		throw e;
-	}
-
-	try {
-		await pgcli.query(`INSERT INTO txindex
-		(
-			address,
-			hash
-		)
-		VALUES ` + idxvalues);
-	} catch (e) {
-		console.log('exception. insert txindex');
-		throw e;
-	}
-
-	values = '';
-	for (let addr in delegates) {
-		let delegate = delegates[addr];
-		if (0 < values.length)
-			values += ',';
-		values += `('${addr}', '${delegate.name}', ${delegate.total_vote})`;
-	}
-
-	try {
-		if (0 < values.length) {
-			await pgcli.query(`INSERT INTO delegates
+	if (0 < block.transactions.length) {
+		try {
+			await pgcli.query(`INSERT INTO transactions
 			(
-				address,
-				name,
-				total_vote
+				version,
+				type,
+				from_address,
+				created_time,
+				data,
+				hash,
+				block_height,
+				sub_data
 			)
-			VALUES ` + values + `
-			ON CONFLICT (address) DO UPDATE
-			SET
-			total_vote = EXCLUDED.total_vote`);
+			VALUES ` + values);
+		} catch (e) {
+			console.log('exception. insert transactions');
+			throw e;
 		}
-	} catch (e) {
-		console.log('exception. insert delegates');
-		throw e;
 	}
+	if (0 < block.header.height) {
+		let producer = await loadAccount(accounts, blockchain.toAddress(block.header.signature.pubkey));
+		addBalance(producer, config.blockchain.BlockReward);
+	}
+	await insertAndUpdateAccounts(accounts);
+	await insertAndUpdateDelegates(delegates);
 
 	try {
 		if (block.header.height % RoundBlock === 0) {
