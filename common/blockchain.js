@@ -7,7 +7,7 @@ const keccak = require('keccak');
 const int64 = require('int64-buffer').Int64LE;
 const txTypeStr = [
   "None", 
-  "RewardTransaction", 
+  "SupplyTransaction", 
   "TransferTransaction",
   "VoteTransaction",
   "RegisterDelegateTransaction",
